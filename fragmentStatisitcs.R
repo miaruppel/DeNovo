@@ -4,7 +4,7 @@ library(tidyverse)
 setwd("C:\\Users\\miar\\Desktop\\data")
 
 # Read in data and store as object
-fragmentTable <- read_delim("fragmentInfoTable.tsv", delim=" ", col_types = "icici")
+fragmentTable <- read_delim("fragmentInfoTable.tsv", delim=" ", col_types = "icicic")
 #view(fragmentTable)
 
 # Create histogram for distribution of missing fragments per peptide
@@ -21,3 +21,6 @@ ggplot(data = x, aes(x = cTerminusEnd)) + geom_histogram(binwidth = 1, fill='red
 
 # Create histogram for distribution of missing fragments on n-terminus side
 ggplot(data = x, aes(x = nTerminusEnd)) + geom_histogram(binwidth = 1, fill='orange')
+
+# Save altered table 
+write.table(x, file='fragmentInfoTable_altered.tsv', sep='/t', row.names = FALSE)
