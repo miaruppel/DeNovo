@@ -17,7 +17,6 @@ from constants import (
     ION_OFFSET,
 )
 
-
 def stack(queue):
     listed = collections.defaultdict(list)
     for t in queue.values():
@@ -110,7 +109,7 @@ def csv(df):
 
     return data
 
-def csv_training(df):
+def csv_training(df, series):
     df.reset_index(drop=True, inplace=True)
     assert "modified_sequence" in df.columns
     assert "collision_energy" in df.columns
@@ -119,7 +118,7 @@ def csv_training(df):
         "collision_energy_aligned_normed": get_numbers(df.collision_energy) / 100.0,
         "sequence_integer": get_sequence_integer(df.modified_sequence),
         "precursor_charge_onehot": get_precursor_charge_onehot(df.precursor_charge),
-        "intensities_raw": get_mz_applied(df),
+        "masses_pred": get_mz_applied(df),
     }
     nlosses = 1
     z = 3
@@ -131,27 +130,69 @@ def csv_training(df):
     masses_pred = sanitize.mask_outofcharge(masses_pred, df.precursor_charge)
     masses_pred = sanitize.reshape_flat(masses_pred)
     data["masses_pred"] = masses_pred
+    print(masses_pred)
 
-    print(masses_pred[0][20:40])
+    # find matching mzs and replace with intensity values
+    masses_pred_copy = masses_pred # to overwrite with intensities later
+    # yeah python is weird about this actually so fix this!!!!
     
-    count = -1 
-    for mass_list in masses_pred:
-        count = count + 1
-        for mass in mass_list:
-            #print(mass)
-            #print(count)
-            df_masses = list(df['masses_raw'])
-            if mass in df_masses[count]:
-                print('yes')
-                
     
-    intensities_raw = get_mz_applied(df)
-    intensities_raw[intensities_raw < 0] = 0
+    
+    df_masses = list(df['masses_raw']) # list of raw masses from dataframe
+    df_intensities = list(df['intensities_raw']) # list of raw intensities from dataframe
+    
+    s_list = series.tolist() # list of MS3 spectra
+    s_count = -1 # for indexing spectra
+    #print(masses_pred_copy[0:3])
+    
+    # for finding closer mass to match spectra
+    def closest(lst, K):
+        return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
+    
+    for mass_list in masses_pred_copy: # mass list for each spectrum
+        s_count = s_count + 1
+        mz_nums = df_masses[s_count].split(' ')
+        df_mass_list = [float(num) for num in mz_nums]
+        
+        int_nums = df_intensities[s_count].split(' ')
+        df_intens_list = [float(num) for num in int_nums]
+        #print(df_intens_list)
+        
+        m_count = -1 # for indexing masses
+        for mass in mass_list: # looking at individual masses
+            m_count = m_count + 1
+            #print(df_intens_list[s_count])
+            if mass != -1: 
+                test = s_list[s_count].findNearest(mass, 0.02) 
+                if test != -1: # masses found 
+                    
+                    # bounds for matching with raw masses 
+                    upper = round(mass + 0.02, 2)
+                    lower = round(mass - 0.02, 2)
+                    #print(mass, upper, lower)
+                    index = [i for i, value in enumerate(df_mass_list) if (round(value, 2) <= upper and round(value, 2) >= lower)]
+                    # if more than one index, we want the one that is closest to to the target
+                    if len(index) > 1:
+                        closer = closest(df_mass_list, mass)
+                        for i in index:
+                            if closer == df_mass_list[i]:
+                                index = [i]
+                    # use index to match intensity 
+                    intensity = df_intens_list[int(str(index)[1:-1])] # removing brackets
+                    # overwrite mass values with intensities 
+                    masses_pred_copy[s_count][m_count] = intensity
+                else:
+                    masses_pred_copy[s_count][m_count] = -1
+    print(masses_pred)
+                 
+    intensities_raw = masses_pred_copy
+    #print(intensities_raw)
+    #intensities_raw[intensities_raw < 0] = 0
     intensities_raw = sanitize.normalize_base_peak(intensities_raw)
-    intensities_raw = sanitize.cap(intensities_raw, nlosses, z)
-    intensities_raw = sanitize.mask_outofrange(intensities_raw, lengths)
-    intensities_raw = sanitize.mask_outofcharge(intensities_raw, df.precursor_charge)
-    intensities_raw = sanitize.reshape_flat(intensities_raw)
+    #intensities_raw = reshape_dims(intensities_raw)
+    #intensities_raw = sanitize.mask_outofrange(intensities_raw, lengths)
+    #intensities_raw = sanitize.mask_outofcharge(intensities_raw, df.precursor_charge)
+    #intensities_raw = sanitize.reshape_flat(intensities_raw)
     data["intensities_raw"] = intensities_raw
 
     #for mass in masses_pred:
