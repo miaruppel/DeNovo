@@ -130,20 +130,15 @@ def csv_training(df, series):
     masses_pred = sanitize.mask_outofcharge(masses_pred, df.precursor_charge)
     masses_pred = sanitize.reshape_flat(masses_pred)
     data["masses_pred"] = masses_pred
-    print(masses_pred)
 
     # find matching mzs and replace with intensity values
-    masses_pred_copy = masses_pred # to overwrite with intensities later
-    # yeah python is weird about this actually so fix this!!!!
-    
-    
+    masses_pred_copy = masses_pred.copy() # to overwrite with intensities later
     
     df_masses = list(df['masses_raw']) # list of raw masses from dataframe
     df_intensities = list(df['intensities_raw']) # list of raw intensities from dataframe
     
     s_list = series.tolist() # list of MS3 spectra
     s_count = -1 # for indexing spectra
-    #print(masses_pred_copy[0:3])
     
     # for finding closer mass to match spectra
     def closest(lst, K):
@@ -156,20 +151,19 @@ def csv_training(df, series):
         
         int_nums = df_intensities[s_count].split(' ')
         df_intens_list = [float(num) for num in int_nums]
-        #print(df_intens_list)
         
         m_count = -1 # for indexing masses
         for mass in mass_list: # looking at individual masses
             m_count = m_count + 1
-            #print(df_intens_list[s_count])
-            if mass != -1: 
+            
+            if mass == -1:
+                masses_pred_copy[s_count][m_count] = 0.0
+            else: 
                 test = s_list[s_count].findNearest(mass, 0.02) 
                 if test != -1: # masses found 
-                    
                     # bounds for matching with raw masses 
                     upper = round(mass + 0.02, 2)
                     lower = round(mass - 0.02, 2)
-                    #print(mass, upper, lower)
                     index = [i for i, value in enumerate(df_mass_list) if (round(value, 2) <= upper and round(value, 2) >= lower)]
                     # if more than one index, we want the one that is closest to to the target
                     if len(index) > 1:
@@ -177,35 +171,33 @@ def csv_training(df, series):
                         for i in index:
                             if closer == df_mass_list[i]:
                                 index = [i]
+
                     # use index to match intensity 
-                    intensity = df_intens_list[int(str(index)[1:-1])] # removing brackets
+                    intensity = df_intens_list[int(str(index)[1:-1])] # removing brackets from index
                     # overwrite mass values with intensities 
                     masses_pred_copy[s_count][m_count] = intensity
                 else:
-                    masses_pred_copy[s_count][m_count] = -1
-    print(masses_pred)
+                    masses_pred_copy[s_count][m_count] = 0.0 # convert to -1 after normalizing base peak
                  
     intensities_raw = masses_pred_copy
-    #print(intensities_raw)
     #intensities_raw[intensities_raw < 0] = 0
     intensities_raw = sanitize.normalize_base_peak(intensities_raw)
-    #intensities_raw = reshape_dims(intensities_raw)
+    #intensities_raw = sanitize.reshape_dims(intensities_raw)
     #intensities_raw = sanitize.mask_outofrange(intensities_raw, lengths)
     #intensities_raw = sanitize.mask_outofcharge(intensities_raw, df.precursor_charge)
     #intensities_raw = sanitize.reshape_flat(intensities_raw)
-    data["intensities_raw"] = intensities_raw
 
-    #for mass in masses_pred:
-     #   print(x)
-     #   for y in x:
-     #       print(y)
-        
-    #intensities[intensities < 0] = 0
-    #intensities = normalize_base_peak(intensities)
-    #intensities = reshape_dims(intensities)
-    #intensities = mask_outofrange(intensities, sequence_lengths)
-    #intensities = mask_outofcharge(intensities, charges)
-    #intensities = reshape_flat(intensities)
-    #data["intensities_pred"] = intensities
+    # convert zeros numbers and nan numbers to -1
+    x_count = -1
+    for x in intensities_raw:
+        x_count = x_count + 1
+        values_count = -1
+        for values in x:
+            values_count = values_count + 1
+            if values == 0.0 or str(values) == 'nan':
+                intensities_raw[x_count][values_count] = -1
+                
+    data["intensities_raw"] = intensities_raw
+    #print(intensities_raw[0:4])
 
     return data
