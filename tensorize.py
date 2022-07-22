@@ -130,7 +130,7 @@ def csv_training(df, series):
     masses_pred = sanitize.mask_outofcharge(masses_pred, df.precursor_charge)
     masses_pred = sanitize.reshape_flat(masses_pred)
     data["masses_pred"] = masses_pred
-    print(masses_pred[0:4])
+    #print(masses_pred[0:4])
     
     # find matching mzs and replace with intensity values
     masses_pred_copy = masses_pred.copy() # to overwrite with intensities later
@@ -199,6 +199,6 @@ def csv_training(df, series):
                 intensities_raw[x_count][values_count] = -1
                 
     data["intensities_raw"] = intensities_raw
-    print(intensities_raw[0:4])
+    #print(intensities_raw[0:4])
 
     return data
