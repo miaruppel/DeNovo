@@ -11,11 +11,11 @@ PRED_BATCH_SIZE = 1024
 PRED_BAYES = False
 PRED_N = 100
 
-TOLERANCE_FTMS = 25
+TOLERANCE_FTMS = 10
 TOLERANCE_ITMS = 0.35
 TOLERANCE_TRIPLETOF = 0.5
 
-TOLERANCE = {"FTMS": (25, "ppm"), "ITMS": (0.35, "da"), "TripleTOF": (50, "ppm")}
+TOLERANCE = {"FTMS": (10, "ppm"), "ITMS": (0.35, "da"), "TripleTOF": (50, "ppm")}
 
 
 ALPHABET = {

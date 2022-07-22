@@ -64,13 +64,13 @@ def parse_ion(string):
 
 def get_mz_applied(df, ion_types="yb"):
     ito = {it: ION_OFFSET[it] for it in ion_types}
-
+    
     def calc_row(row):
         array = np.zeros([MAX_ION, len(ION_TYPES), len(NLOSSES), len(CHARGES)])
         fw, bw = match.get_forward_backward(row.modified_sequence)
         for z in range(row.precursor_charge):
             zpp = z + 1
-            annotation = annotate.get_annotation(fw, bw, zpp, ito)
+            annotation = annotate.get_annotation(fw, bw, zpp, ito, match.fragment_type)
             for ion, mz in annotation.items():
                 it, _in, nloss = parse_ion(ion)
                 array[_in, it, nloss, z] = mz
@@ -130,7 +130,8 @@ def csv_training(df, series):
     masses_pred = sanitize.mask_outofcharge(masses_pred, df.precursor_charge)
     masses_pred = sanitize.reshape_flat(masses_pred)
     data["masses_pred"] = masses_pred
-
+    print(masses_pred[0:4])
+    
     # find matching mzs and replace with intensity values
     masses_pred_copy = masses_pred.copy() # to overwrite with intensities later
     
@@ -145,6 +146,7 @@ def csv_training(df, series):
         return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
     
     for mass_list in masses_pred_copy: # mass list for each spectrum
+        #print(mass_list)
         s_count = s_count + 1
         mz_nums = df_masses[s_count].split(' ')
         df_mass_list = [float(num) for num in mz_nums]
@@ -155,7 +157,6 @@ def csv_training(df, series):
         m_count = -1 # for indexing masses
         for mass in mass_list: # looking at individual masses
             m_count = m_count + 1
-            
             if mass == -1:
                 masses_pred_copy[s_count][m_count] = 0.0
             else: 
@@ -165,13 +166,13 @@ def csv_training(df, series):
                     upper = round(mass + 0.02, 2)
                     lower = round(mass - 0.02, 2)
                     index = [i for i, value in enumerate(df_mass_list) if (round(value, 2) <= upper and round(value, 2) >= lower)]
+                    
                     # if more than one index, we want the one that is closest to to the target
                     if len(index) > 1:
                         closer = closest(df_mass_list, mass)
                         for i in index:
                             if closer == df_mass_list[i]:
                                 index = [i]
-
                     # use index to match intensity 
                     intensity = df_intens_list[int(str(index)[1:-1])] # removing brackets from index
                     # overwrite mass values with intensities 
@@ -198,6 +199,6 @@ def csv_training(df, series):
                 intensities_raw[x_count][values_count] = -1
                 
     data["intensities_raw"] = intensities_raw
-    #print(intensities_raw[0:4])
+    print(intensities_raw[0:4])
 
     return data

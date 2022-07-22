@@ -28,6 +28,7 @@ def peptide_parser(p):
 
 
 def get_forward_backward(peptide):
+    #print(peptide)
     amino_acids = peptide_parser(peptide)
     masses = [constants.AMINO_ACID[a] for a in amino_acids]
     forward = numpy.cumsum(masses)
@@ -71,7 +72,10 @@ def binarysearch(masses_raw, theoretical, mass_analyzer):
 def match(row, ion_types, max_charge=constants.DEFAULT_MAX_CHARGE):
     masses_observed = read_attribute(row, "masses_raw")
     intensities_observed = read_attribute(row, "intensities_raw")
-    forward_sum, backward_sum = get_forward_backward(row.modified_sequence[1:-1])
+    forward_sum, backward_sum = get_forward_backward(row.modified_sequence)
+    #print(forward_sum)
+    #print('------------------------------------------------------------------------')
+    #print(backward_sum)
     _max_charge = row.charge if row.charge <= max_charge else max_charge
     matches = []
     for charge_index in range(_max_charge):
@@ -83,9 +87,10 @@ def match(row, ion_types, max_charge=constants.DEFAULT_MAX_CHARGE):
         }
         charge = charge_index + 1
         annotations = annotate.get_annotation(
-            forward_sum, backward_sum, charge, ion_types
+            forward_sum, backward_sum, charge, ion_types, fragment_type
         )
         for annotation, mass_t in annotations.items():
+            #rint(annotation, mass_t)
             index = binarysearch(masses_observed, mass_t, row.mass_analyzer)
             if index is not None:
                 d["masses_raw"].append(masses_observed[index])
@@ -114,7 +119,14 @@ def c_lambda(matches, charge, attr):
 
 def augment(df, ion_types, charge_max):
     matches = {}
+    global fragment_type
+    
     for i, row in df.iterrows():
+        if df.target_fragment[i].startswith('y'): # no special cases for internal ions from y fragments
+            fragment_type = 'y'
+        elif df.target_fragment[i].startswith('b'): # unique case when internal y ion in b fragment
+            fragment_type = 'b'
+            
         matches[i] = match(row, ion_types, charge_max)
 
     # augment dataframe and write
