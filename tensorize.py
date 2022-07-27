@@ -115,14 +115,15 @@ def csv_training(df, series):
     assert "collision_energy" in df.columns
     assert "precursor_charge" in df.columns
     data = {
-        "collision_energy_aligned_normed": get_numbers(df.collision_energy) / 100.0,
-        "sequence_integer": get_sequence_integer(df.modified_sequence),
-        "precursor_charge_onehot": get_precursor_charge_onehot(df.precursor_charge),
+        "collision_energy_in": get_numbers(df.collision_energy) / 100.0,
+        "peptide_in": get_sequence_integer(df.modified_sequence),
+        #"peptide_in": np.array(df.modified_sequence),
+        "precursor_charge_in": get_precursor_charge_onehot(df.precursor_charge),
         "masses_pred": get_mz_applied(df),
     }
     nlosses = 1
     z = 3
-    lengths = (data["sequence_integer"] > 0).sum(1)
+    lengths = (data["peptide_in"] > 0).sum(1)
 
     masses_pred = get_mz_applied(df)
     masses_pred = sanitize.cap(masses_pred, nlosses, z)

@@ -23,9 +23,15 @@ os.chdir(r'C:\Users\miar\Desktop\data')
 
 
 # experiment files 
-mzML = 'HEK293T_De_Novo_053122_Glu-C_B_correctRTSenzyme_BP.mzML'
-log = 'App-2022-05-31_20-49-35.log'
-realtime = 'HEK293T_De_Novo_053122_Glu-C_B_correctRTSenzyme_BP_realtimesearch.tsv'
+mzML = 'HEK293T_De_Novo_061122_Glu-C_B_BP_anyLength_HCD30.mzML'
+log = 'App-2022-06-12_22-28-53.log'
+realtime = 'HEK293T_De_Novo_061122_Glu-C_B_BP_anyLength_HCD30_realtimesearch.tsv'
+
+print('Experiment Files: ')
+print(mzML)
+print(log)
+print(realtime)
+print('-----------------------------------------------------------------------------------------')
 
 
 # In[4]:
@@ -54,6 +60,7 @@ for s in exp.getSpectra():
         
 print("Number of MS2 scans: " + str(len(specM2)))
 print("Number of MS3 scans: " + str(len(specM3)))
+print('-----------------------------------------------------------------------------------------')
 
 # store the modified data structure on disk
 # can only save one at a time or data overwrites....
@@ -203,12 +210,6 @@ df = pd.DataFrame(table_rows)
 fragment_df = df.assign(Target_Fragment=target_values)
 
 
-# In[12]:
-
-
-#fragment_df
-
-
 # In[13]:
 
 
@@ -340,12 +341,6 @@ if df1.equals(df2):
     new_fragment_df =  df1
 
 
-# In[21]:
-
-
-#new_fragment_df
-
-
 # In[22]:
 
 
@@ -403,7 +398,7 @@ def findFragmentsMS3(peptide_object, charge, i):
             y_ion = full_seq.getSuffix(ion)
             for z in range(1, charge):
                 mz_y = y_ion.getMonoWeight(Residue.ResidueType.YIon, z) / z
-                y_index.append(specM3[i].findNearest(mz_y, 0.4))
+                y_index.append(specM3[i].findNearest(mz_y, 0.02))
 
         # reverse list (the first b ion corresponds with the last y ion)
         y_index.reverse() 
@@ -413,7 +408,7 @@ def findFragmentsMS3(peptide_object, charge, i):
             b_ion = full_seq.getPrefix(ion)
             for z in range(1, charge):
                 mz_b = b_ion.getMonoWeight(Residue.ResidueType.Internal, z) / z
-                b_index.append(specM3[i].findNearest(mz_b, 0.4))
+                b_index.append(specM3[i].findNearest(mz_b, 0.02))
                 
     # targeted fragment is a b ion
     elif new_fragment_df['Target_Fragment'][i].startswith('b'):
@@ -427,14 +422,14 @@ def findFragmentsMS3(peptide_object, charge, i):
             b_ion = full_seq.getPrefix(ion)
             for z in range(1, charge):
                 mz_b = b_ion.getMonoWeight(Residue.ResidueType.BIon, z) / z
-                b_index.append(specM3[i].findNearest(mz_b, 0.4))
+                b_index.append(specM3[i].findNearest(mz_b, 0.02))
 
         # checking fragment for y ions
         for ion in range(1, int(b_num)):
-            y_ion = full_seq.getPrefix(ion)
+            y_ion = full_seq.getSuffix(ion)
             for z in range(1, charge):
                 mz_y = y_ion.getMonoWeight(Residue.ResidueType.Internal, z) / z
-                y_index.append(specM3[i].findNearest(mz_y, 0.4))
+                y_index.append(specM3[i].findNearest(mz_y, 0.02))
 
         # reverse list (the first b ion corresponds with the last y ion)
         y_index.reverse()
@@ -467,7 +462,7 @@ for i in new_fragment_df.index:
     peptide_object = AASequence.fromString(new_fragment_df['Sequence'][i])
     
     # the charge associated with this sequence
-    charge = new_fragment_df['Charge'][i]
+    charge = new_fragment_df['Charge'][i] + 1
     
     # call findFragmentsMS3 function 
     foundinMS3, full_seq = findFragmentsMS3(peptide_object, charge, i)
@@ -487,228 +482,26 @@ new_fragment_df = new_fragment_df.assign(Fragment_Sequence = fragment_seqs)
 # add column of locations found in fragment 
 new_fragment_df = new_fragment_df.assign(Locations_Found=found_list)
 
+
+# In[28]:
+
+
 # remove any rows with no locations found (empty lists)
 for i in new_fragment_df.index:
     if new_fragment_df['Locations_Found'][i] == []:
         new_fragment_df.drop(i, axis=0, inplace=True)
 
 
-# In[27]:
+# In[ ]:
 
 
-# currently, 'locations found' represents distance from n terminus for the FRAGMENT sequence 
-# want the location as a distance from the n terminus for the entire peptide sequence 
-# can then easily match locations between MS3 and MS2
-locations = []
-for i in new_fragment_df.index:
-    if new_fragment_df['Target_Fragment'][i].startswith('y'):
-        frag_length = len(new_fragment_df['Fragment_Sequence'][i])
-        whole_seq_length = new_fragment_df['Sequence_Length'][i]
-        starting_loc = whole_seq_length - frag_length # starting point - location from n terminus 
-        
-    elif new_fragment_df['Target_Fragment'][i].startswith('b'):
-        starting_loc = 0 # starts at beginning of sequence
-
-    test = []
-    for x in new_fragment_df['Locations_Found'][i]:
-        location = starting_loc + x
-        
-        test.append(location)
-        
-    locations.append(test) # distance away from n terminus 
-
-# overwrite locations column to resemble location from n terminus for entire sequence 
-new_fragment_df['Locations_Found'] = locations
-
-# clean up df to remove info that is now irrelevant
-checkMS3 = new_fragment_df.drop(columns=['Charge', 'Sequence_Length', 'Target_Fragment', 'Number_Missing'])
 
 
-# In[28]:
+
+# In[ ]:
 
 
-# convert missing locations strings to list for checking false positives
-loc_list = []
-for string in list(checkMS3['Missing_Fragment_Locations']):
-    loc_list.append(string.split(','))
-new_fragment_df = new_fragment_df.assign(Missing_Fragment_Locations=loc_list)
 
-
-# In[29]:
-
-
-new_fragment_df
-
-
-# In[30]:
-
-
-def switchSeq():
-    # necessary to convert to peptide object due to some sequences with modifications
-    peptide_object = AASequence.fromString(new_fragment_df['Sequence'][i])
-    b_ion = peptide_object.getPrefix(int(loc))
-    y_ion = peptide_object.getSuffix(int(new_fragment_df['Sequence_Length'][i])-int(loc))
-                
-    # convert ions to strings and switch characters
-    # first character of y ion sequence becomes last character of b ion sequence
-    # last character of b ion sequence becomes first character of y ion sequence
-    if str(b_ion)[-1] == ']': # to deal with cases when b ion ends in modification
-        skip_brackets_b = str(b_ion)[:-10]
-        b_seq = skip_brackets_b + str(y_ion)[0]
-
-        skip_brackets_y  = str(b_ion)[-10:]
-        y_seq = skip_brackets_y + str(y_ion)[1:]
-        
-    elif str(y_ion).startswith('M['):
-        include_mod_b = str(y_ion)[:10]
-        b_seq = str(b_ion)[:-1] + include_mod_b
-
-        include_mod_y = str(y_ion)[10:]
-        y_seq = str(b_ion)[-1] + include_mod_y
-        
-    else:
-        b_seq = str(b_ion)[:-1] + str(y_ion)[0]
-        y_seq = str(b_ion)[-1] + str(y_ion)[1:]
-              
-    # convert switched sequences back to peptide objects
-    peptide_b = AASequence.fromString(b_seq)
-    peptide_y = AASequence.fromString(y_seq)
-
-    return peptide_b, peptide_y
-
-
-# In[37]:
-
-
-# for every target for an MS3, check false positive rate for incorrect sequence (ex. PE vs EP)
-total = []
-false_pos = []
-
-for i in new_fragment_df.index:
-    if new_fragment_df['Target_Fragment'][i].startswith('y'):
-        frag_length = len(new_fragment_df['Fragment_Sequence'][i])
-        whole_seq_length = new_fragment_df['Sequence_Length'][i]
-        starting_loc = whole_seq_length - frag_length # starting point - location from n terminus 
-        
-    elif new_fragment_df['Target_Fragment'][i].startswith('b'):
-        starting_loc = 0 # starts at beginning of sequence
-    
-    # needed for range
-    end_loc = starting_loc + len(new_fragment_df['Fragment_Sequence'][i]) 
-    
-    # charge for this scan
-    charge = new_fragment_df['Charge'][i]
-    
-    for loc in new_fragment_df['Missing_Fragment_Locations'][i]:
-        if loc == '':
-            new_fragment_df.drop(i, axis=0, inplace=True) # remove indices that are not missing any fragments
-            
-        elif int(loc) in range(starting_loc, end_loc): 
-            if new_fragment_df['Target_Fragment'][i].startswith('y'): # separate to deal with internal fragment issue
-                
-                peptide_b, peptide_y = switchSeq()
-                
-                for z in range(1, charge):
-                    mz_y = peptide_y.getMonoWeight(Residue.ResidueType.YIon, z) / z
-                    y_index = specM3[i].findNearest(mz_y, 0.4)
-                
-                    mz_b = peptide_b.getMonoWeight(Residue.ResidueType.Internal, z) / z
-                    b_index = specM3[i].findNearest(mz_b, 0.4)
-                    
-                    if (y_index and b_index) != -1:
-                        #print('Location ' + loc + ' was found at index ' + str(i) + ' for y target')
-                        false_pos.append(i)
-                        
-                    total.append('y_ion for index ' + str(i) + ' checked at location ' + str(loc))
-                    total.append('b_ion for index ' + str(i) + ' checked at location ' + str(loc))   
-            
-            elif new_fragment_df['Target_Fragment'][i].startswith('b'): # separate to deal with internal fragment issue
-                
-                peptide_b, peptide_y = switchSeq()
-                
-                for z in range(1, charge):
-                    mz_b = peptide_b.getMonoWeight(Residue.ResidueType.BIon, z) / z
-                    b_index = specM3[i].findNearest(mz_b, 0.4)
-                    
-                    mz_y = peptide_y.getMonoWeight(Residue.ResidueType.Internal, z) / z
-                    y_index = specM3[i].findNearest(mz_y, 0.4)
-                
-                    if (y_index and b_index) != -1:
-                        #print('Location ' + loc + ' was found at index ' + str(i) + ' for b target')
-                        false_pos.append(i)
-                    
-                    total.append('y_ion for index ' + str(i) + ' checked at location ' + str(loc))
-                    total.append('b_ion for index ' + str(i) + ' checked at location ' + str(loc))
-
-
-# In[38]:
-
-
-# percentage of false positives
-print('Percentage of False Positives: ' + str((len(false_pos) / len(total)) * 100) + '%')
-
-
-# In[39]:
-
-
-ms3_index = list(checkMS3.index) # so we can easily check between dataframes with different indices
-found = [] # list of fragments found (missing in MS2, were found in MS3)
-
-# look throughout both dataframes to find any missing fragments
-for i in checkfrags_df.index:
-    scan = checkfrags_df['"Scan_Number"'][i]
-    
-    # for scans in both dataframes 
-    if str(scan) in list(checkMS3['Scan_Number']):
-        
-        # what is the index of this scan in the checkMS3 df?
-        for ind in ms3_index:
-            if str(scan) == checkMS3['Scan_Number'][ind]:
-                index = ind
-        
-        # if there is only one location found in MS3 to check
-        if len(checkMS3['Locations_Found'][index]) == 1:
-            if checkMS3['Locations_Found'][index] == [int(checkfrags_df['"nTerminusEnd"'][i])]:
-                found.append('Location matched')
-                #print(checkMS3.iloc[index])
-                #print(int(checkfrags_df['"nTerminusEnd"'][i]))
-        
-        # multiple locations to check in a single scan
-        elif len(checkMS3['Locations_Found'][index]) > 1:
-            
-            if any(loc == int(checkfrags_df['"nTerminusEnd"'][i]) for loc in checkMS3['Locations_Found'][index]):
-                found.append('Location matched')
-
-
-# In[40]:
-
-
-# visualize the percentage of fragments that could potentially be found in MS3
-plt.title(mzML)
-plt.bar('Targeted ion doesn\'t help', len(ms3no_help))
-plt.bar('Targeted ion could help', len(ms3could_help), color='orange')
-
-#plt.show()
-plt.savefig('TargetFragCouldHelp.png')
-
-
-# In[41]:
-
-
-# visualize the percentage of fragments that were actually found
-plt.bar('Target could help', len(ms3could_help), color='orange')
-plt.bar('Frag was found', len(found), color='g')
-
-plt.title(mzML)
-#plt.show()
-plt.savefig('FragFound.png')
-
-
-# In[42]:
-
-
-# percentage of frags found in the target 
-print('Percentage of Fragments Found From MS3 Targets that COULD Help: ' + str((len(found) / len(ms3could_help)) * 100) + '%')
 
 
 # In[ ]:

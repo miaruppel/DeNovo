@@ -90,7 +90,7 @@ def match(row, ion_types, max_charge=constants.DEFAULT_MAX_CHARGE):
             forward_sum, backward_sum, charge, ion_types, fragment_type
         )
         for annotation, mass_t in annotations.items():
-            print(annotation, mass_t)
+            #print(annotation, mass_t)
             index = binarysearch(masses_observed, mass_t, row.mass_analyzer)
             if index is not None:
                 d["masses_raw"].append(masses_observed[index])
