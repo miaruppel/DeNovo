@@ -81,7 +81,8 @@ def parseScanLine(input):
 def parseTargetIons(input):
     i = input.split('Target Fragment: ')
     ion = i[1].split(',')[0]
-    return ion 
+    charge = i[1].split(',')[2][-1]
+    return ion, charge
 
 
 # In[7]:
@@ -97,13 +98,15 @@ try:
     # dict for scan numbers and corresponding fragments 
     scan2frag = dict()
     target_values = []
+    target_charge = []
     with open(log) as f:
         for line in f:
             if search in line:
                 scan_number, precursor_mz, trimmed_fragment_mz = parseScanLine(line)
                 scan2frag[scan_number] = [float(precursor_mz), float(trimmed_fragment_mz)]
             elif search_target in line:
-                target_ion = parseTargetIons(line)
+                target_ion, charge = parseTargetIons(line)
+                target_charge.append(int(charge))
                 target_values.append(target_ion) #to add to final dataframe
             
     # if the input string doesn't exist in the text file
@@ -271,7 +274,7 @@ for s in specM3:
 
 # In[19]:
 
-
+# not convinced this is necessary, but perhaps there is a case somewhere where MS2 and MS3 scans do not match up
 def matchingMS3s(which_mz_list, type_str): # either fragment or precursor
     
     values = []
@@ -475,9 +478,11 @@ for i in new_fragment_df.index:
 
 
 # modifying dataframe to make life easier
-
 # change full sequences to fragment sequences 
 new_fragment_df = new_fragment_df.assign(Fragment_Sequence = fragment_seqs)
+
+# add column for target charges
+new_fragment_df = new_fragment_df.assign(Target_Charge=target_charge)
 
 # add column of locations found in fragment 
 new_fragment_df = new_fragment_df.assign(Locations_Found=found_list)
